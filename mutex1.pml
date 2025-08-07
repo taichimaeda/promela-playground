@@ -2,8 +2,6 @@
 #define NUM_THREADS 2 // default value if not set by -DNUMTHREADS
 #endif
 
-#define MAX_BYTE 255
-
 inline atomic_load(loc, ret) {
   d_step { ret = loc }
 }
@@ -20,8 +18,8 @@ inline atomic_compare_and_swap(loc, expected, desired, ret) {
   d_step { loc = (loc == expected -> desired : loc); ret = (loc == desired) }
 }
 
-inline atomic_add(loc, ret) {
-  d_step { loc = (loc == MAX_BYTE -> 0 : loc + 1); ret = loc }
+inline atomic_add(loc, val, ret) {
+  d_step { loc = loc + val; ret = loc }
 }
 
 typedef Sema {

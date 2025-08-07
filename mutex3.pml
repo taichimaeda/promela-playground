@@ -18,6 +18,10 @@ inline atomic_compare_and_swap(loc, expected, desired, ret) {
   d_step { loc = (loc == expected -> desired : loc); ret = (loc == desired) }
 }
 
+inline atomic_add(loc, val, ret) {
+  d_step { loc = loc + val; ret = loc }
+}
+
 typedef Sema {
   byte value;
   bool waiting[NUM_THREADS];
@@ -60,12 +64,23 @@ inline mutex_sema_release() {
   }
 }
 
+#define MAX_SPIN 4
+
 inline mutex_lock() {
   byte old;
+  byte iter = 0;
+continue:
   do
   :: atomic_swap(mutex.state, MUTEX_LOCKED, old);
      if
-     :: old != 0 -> mutex_sema_acquire()
+     :: old != 0 ->
+        if
+        :: iter < MAX_SPIN ->
+           iter++;
+           goto continue;
+        :: else
+        fi
+        mutex_sema_acquire()
      :: else -> break
      fi
   od

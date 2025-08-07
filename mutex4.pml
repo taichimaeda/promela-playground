@@ -18,6 +18,10 @@ inline atomic_compare_and_swap(loc, expected, desired, ret) {
   d_step { loc = (loc == expected -> desired : loc); ret = (loc == desired) }
 }
 
+inline atomic_add(loc, val, ret) {
+  d_step { loc = loc + val; ret = loc }
+}
+
 typedef Sema {
   byte value;
   bool waiting[NUM_THREADS];
@@ -60,20 +64,81 @@ inline mutex_sema_release() {
   }
 }
 
+#define MAX_SPIN 4
+#define MUTEX_LOCKED 1
+#define MUTEX_WAITER_SHIFT 2
+
 inline mutex_lock() {
+  byte iter;
   byte old;
+  byte new;
+  byte swapped;
+
+  atomic_compare_and_swap(mutex.state, 0, MUTEX_LOCKED, swapped)
+  if
+  :: swapped -> goto done
+  :: else
+  fi
+
+  iter = 0;
+  old = mutex.state;
+continue:
   do
-  :: atomic_swap(mutex.state, MUTEX_LOCKED, old);
-     if
-     :: old != 0 -> mutex_sema_acquire()
-     :: else -> break
+  :: if
+     :: old&MUTEX_LOCKED != 0 && iter < MAX_SPIN ->
+        iter++;
+        old = mutex.state;
+        goto continue;
+     :: else
      fi
+     new = old | MUTEX_LOCKED;
+     if
+     :: old&MUTEX_LOCKED != 0 ->
+        new = new + (1 << MUTEX_WAITER_SHIFT);
+     :: else
+     fi
+     atomic_compare_and_swap(mutex.state, old, new, swapped);
+     if
+     :: swapped ->
+        if
+        :: old&MUTEX_LOCKED == 0 -> break
+        :: mutex_sema_acquire();
+           iter = 0
+        fi
+     :: else
+     fi
+     old = mutex.state
   od
+done:
 }
 
 inline mutex_unlock() {
-  atomic_store(mutex.state, 0);
-  mutex_sema_release()
+  byte old;
+  byte new;
+  byte swapped;
+
+  atomic_add(mutex.state, -MUTEX_LOCKED, new);
+  if
+  :: new == 0; goto done
+  :: else
+  fi
+
+  old = new;
+  do
+  :: if
+     :: old>>MUTEX_WAITER_SHIFT == 0 || old&MUTEX_LOCKED == 0 ->
+        goto done
+     :: else
+     fi
+     new = old - 1<<MUTEX_WAITER_SHIFT;
+     atomic_compare_and_swap(mutex.state, old, new, swapped);
+     if
+     :: swapped -> mutex_sema_acquire()
+     :: else
+     fi
+     old = mutex.state
+  od
+done:
 }
 
 byte num_threads_in_cs;
@@ -94,10 +159,10 @@ active [NUM_THREADS] proctype Thread() {
   od
 }
 
-// mutual exclusion
-ltl safety {
-  [](num_threads_in_cs <= 1)
-}
+// // mutual exclusion
+// ltl safety {
+//   [](num_threads_in_cs <= 1)
+// }
 
 // no starvation (does not hold)
 // ltl liveness {

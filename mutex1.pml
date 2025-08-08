@@ -14,8 +14,8 @@ inline atomic_swap(loc, val, ret) {
   d_step { ret = loc; loc = val }
 }
 
-inline atomic_compare_and_swap(loc, expected, desired, ret) { 
-  d_step { loc = (loc == expected -> desired : loc); ret = (loc == desired) }
+inline atomic_compare_and_swap(loc, expected, desired, ret) {
+  d_step { ret = (loc == expected); loc = (ret -> desired : loc) }
 }
 
 inline atomic_add(loc, val, ret) {
@@ -85,6 +85,7 @@ active [NUM_THREADS] proctype Thread() {
      num_threads_in_cs--;
      mutex_unlock();
      have_lock[_pid] = false
+  :: break
   od
 }
 

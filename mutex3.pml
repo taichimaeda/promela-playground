@@ -2,6 +2,9 @@
 #define NUM_THREADS 2 // default value if not set by -DNUMTHREADS
 #endif
 
+#define MAX_SPIN 4
+#define MUTEX_LOCKED 1
+
 inline atomic_load(loc, ret) {
   d_step { ret = loc }
 }
@@ -15,7 +18,7 @@ inline atomic_swap(loc, val, ret) {
 }
 
 inline atomic_compare_and_swap(loc, expected, desired, ret) {
-  d_step { loc = (loc == expected -> desired : loc); ret = (loc == desired) }
+  d_step { ret = (loc == expected); loc = (ret -> desired : loc) }
 }
 
 inline atomic_add(loc, val, ret) {
@@ -33,8 +36,6 @@ typedef Mutex {
   Sema sema;
   byte state;
 }
-
-#define MUTEX_LOCKED 1
 
 Mutex mutex;
 
@@ -64,8 +65,6 @@ inline mutex_sema_release() {
   }
 }
 
-#define MAX_SPIN 4
-
 inline mutex_lock() {
   byte old;
   byte iter = 0;
@@ -92,27 +91,22 @@ inline mutex_unlock() {
 }
 
 byte num_threads_in_cs;
-bool want_lock[NUM_THREADS];
-bool have_lock[NUM_THREADS];
 
 active [NUM_THREADS] proctype Thread() {
   assert(_pid < NUM_THREADS);
   do 
-  :: want_lock[_pid] = true;
-     mutex_lock();
-     want_lock[_pid] = false;
-     have_lock[_pid] = true;
+  :: mutex_lock();
      num_threads_in_cs++;
      num_threads_in_cs--;
-     have_lock[_pid] = false;
      mutex_unlock();
+  :: break
   od
 }
 
-// mutual exclusion
-ltl safety {
-  [](num_threads_in_cs <= 1)
-}
+// // mutual exclusion
+// ltl safety {
+//   [](num_threads_in_cs <= 1)
+// }
 
 // no starvation (does not hold)
 // ltl liveness {

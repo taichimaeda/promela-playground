@@ -1,6 +1,10 @@
 #ifndef NUM_THREADS
-#define NUM_THREADS 2 // default value if not set by -DNUMTHREADS
+#define NUM_THREADS 3 // default value if not set by -DNUMTHREADS
 #endif
+
+#define MAX_SPIN 4
+#define MUTEX_LOCKED 1
+#define MUTEX_WAITER_SHIFT 1
 
 inline atomic_load(loc, ret) {
   d_step { ret = loc }
@@ -15,7 +19,7 @@ inline atomic_swap(loc, val, ret) {
 }
 
 inline atomic_compare_and_swap(loc, expected, desired, ret) {
-  d_step { loc = (loc == expected -> desired : loc); ret = (loc == desired) }
+  d_step { ret = (loc == expected); loc = (ret -> desired : loc) }
 }
 
 inline atomic_add(loc, val, ret) {
@@ -64,15 +68,11 @@ inline mutex_sema_release() {
   }
 }
 
-#define MAX_SPIN 4
-#define MUTEX_LOCKED 1
-#define MUTEX_WAITER_SHIFT 2
-
 inline mutex_lock() {
   byte iter;
   byte old;
   byte new;
-  byte swapped;
+  bool swapped;
 
   atomic_compare_and_swap(mutex.state, 0, MUTEX_LOCKED, swapped)
   if
@@ -85,7 +85,7 @@ inline mutex_lock() {
 continue:
   do
   :: if
-     :: old&MUTEX_LOCKED != 0 && iter < MAX_SPIN ->
+     :: (old&MUTEX_LOCKED) != 0 && iter < MAX_SPIN ->
         iter++;
         old = mutex.state;
         goto continue;
@@ -93,7 +93,7 @@ continue:
      fi
      new = old | MUTEX_LOCKED;
      if
-     :: old&MUTEX_LOCKED != 0 ->
+     :: (old&MUTEX_LOCKED) != 0 ->
         new = new + (1 << MUTEX_WAITER_SHIFT);
      :: else
      fi
@@ -101,10 +101,11 @@ continue:
      if
      :: swapped ->
         if
-        :: old&MUTEX_LOCKED == 0 -> break
-        :: mutex_sema_acquire();
-           iter = 0
+        :: (old&MUTEX_LOCKED) == 0 -> break
+        :: else
         fi
+        mutex_sema_acquire();
+        iter = 0
      :: else
      fi
      old = mutex.state
@@ -115,7 +116,7 @@ done:
 inline mutex_unlock() {
   byte old;
   byte new;
-  byte swapped;
+  bool swapped;
 
   atomic_add(mutex.state, -MUTEX_LOCKED, new);
   if
@@ -126,11 +127,11 @@ inline mutex_unlock() {
   old = new;
   do
   :: if
-     :: old>>MUTEX_WAITER_SHIFT == 0 || old&MUTEX_LOCKED == 0 ->
+     :: (old>>MUTEX_WAITER_SHIFT) == 0 || (old&MUTEX_LOCKED) == 0 ->
         goto done
      :: else
      fi
-     new = old - 1<<MUTEX_WAITER_SHIFT;
+     new = old - (1<<MUTEX_WAITER_SHIFT);
      atomic_compare_and_swap(mutex.state, old, new, swapped);
      if
      :: swapped -> mutex_sema_acquire()
@@ -142,20 +143,15 @@ done:
 }
 
 byte num_threads_in_cs;
-bool want_lock[NUM_THREADS];
-bool have_lock[NUM_THREADS];
 
 active [NUM_THREADS] proctype Thread() {
   assert(_pid < NUM_THREADS);
   do 
-  :: want_lock[_pid] = true;
-     mutex_lock();
-     want_lock[_pid] = false;
-     have_lock[_pid] = true;
+  :: mutex_lock();
      num_threads_in_cs++;
      num_threads_in_cs--;
-     have_lock[_pid] = false;
      mutex_unlock();
+  :: break
   od
 }
 

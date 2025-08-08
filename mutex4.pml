@@ -23,7 +23,7 @@ inline mutex_lock() {
 
   atomic_compare_and_swap(mutex_state, 0, MUTEX_LOCKED, swapped)
   if
-  :: swapped -> goto done
+  :: swapped -> goto done;
   :: else
   fi
 
@@ -48,14 +48,14 @@ continue:
      if
      :: swapped ->
         if
-        :: (old&MUTEX_LOCKED) == 0 -> break
+        :: (old&MUTEX_LOCKED) == 0 -> break;
         :: else
         fi
         chan_wait(mutex_chan);
-        iter = 0
+        iter = 0;
      :: else
      fi
-     old = mutex_state
+     old = mutex_state;
   od
 done:
 }
@@ -67,24 +67,24 @@ inline mutex_unlock() {
 
   atomic_add(mutex_state, -MUTEX_LOCKED, new);
   if
-  :: new == 0; goto done
+  :: new == 0; goto done;
   :: else
   fi
 
   old = new;
   do
   :: if
-     :: (old>>MUTEX_WAITER_SHIFT) == 0 || (old&MUTEX_LOCKED) == 0 ->
-        goto done
+     :: (old>>MUTEX_WAITER_SHIFT) == 0 || (old&MUTEX_LOCKED) != 0 ->
+        goto done;
      :: else
      fi
      new = old - (1<<MUTEX_WAITER_SHIFT);
      atomic_compare_and_swap(mutex_state, old, new, swapped);
      if
-     :: swapped -> chan_wake(mutex_chan)
+     :: swapped -> chan_wake(mutex_chan);
      :: else
      fi
-     old = mutex_state
+     old = mutex_state;
   od
 done:
 }

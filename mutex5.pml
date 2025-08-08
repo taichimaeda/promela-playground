@@ -9,10 +9,10 @@
 #define MUTEX_STARVING 4     // 1 << 2
 #define MUTEX_WAITER_SHIFT 3 // 3
 
-#include "chan.pml"
+#include "sema2.pml"
 #include "atomic.pml"
 
-Chan mutex_chan;
+Sema mutex_sema;
 byte mutex_state;
 
 inline mutex_lock() {
@@ -66,7 +66,7 @@ continue:
         :: (old&MUTEX_LOCKED) == 0 -> break;
         :: else
         fi
-        chan_wait(mutex_chan);
+        sema_acquire(mutex_sema);
         awoke = true;
         iter = 0;
      :: else
@@ -97,7 +97,9 @@ inline mutex_unlock() {
      new = old - (1<<MUTEX_WAITER_SHIFT) | MUTEX_WOKEN;
      atomic_compare_and_swap(mutex_state, old, new, swapped);
      if
-     :: swapped -> chan_wake(mutex_chan);
+     // now we can use sema release
+     // the woken bit does necessary bookkeeping to prevent duplicate sema release
+     :: swapped -> sema_release(mutex_sema);
      :: else
      fi
      old = mutex_state;
@@ -118,7 +120,7 @@ active [NUM_THREADS] proctype Thread() {
   od
 }
 
-// // mutual exclusion
-// ltl safety {
-//   [](num_threads_in_cs <= 1)
-// }
+// mutual exclusion
+ltl safety {
+  [](num_threads_in_cs <= 1)
+}

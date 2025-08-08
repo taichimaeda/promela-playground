@@ -9,7 +9,10 @@
 #define MUTEX_STARVING 4     // 1 << 2
 #define MUTEX_WAITER_SHIFT 3 // 3
 
-#include "sema4.pml"
+// need to set max sema value
+// otherwise sema release can repeatedly increment it until overflow
+#define MAX_SEMA_VALUE 1
+#include "sema2.pml"
 #include "atomic.pml"
 
 Sema mutex_sema;
@@ -28,8 +31,6 @@ inline mutex_lock() {
 
 inline mutex_unlock() {
   atomic_store(mutex_state, 0);
-  // cannot use sema_release here
-  // otherwise sema value gets incremented until it wraps around
   sema_release(mutex_sema);
 }
 

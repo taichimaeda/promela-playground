@@ -1,5 +1,7 @@
 # PromelaPlayground
 
+Spin Version 6.5.2 -- 6 December 2019
+
 ```console
 spin -a version1.pml
 clang -o pan pan.c

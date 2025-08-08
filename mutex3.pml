@@ -9,7 +9,8 @@
 #define MUTEX_STARVING 4     // 1 << 2
 #define MUTEX_WAITER_SHIFT 3 // 3
 
-#include "sema4.pml"
+#define MAX_SEMA_VALUE 1
+#include "sema2.pml"
 #include "atomic.pml"
 
 Sema mutex_sema;

@@ -42,6 +42,14 @@ inline sema_release(sema) {
        sema.count--;
     :: else
     fi
-    sema.value++;
+#ifndef MAX_SEMA_VALUE
+  sema.value++;
+#else
+  if
+  :: sema.value < MAX_SEMA_VALUE ->
+     sema.value++;
+  :: else
+  fi
+#endif
   }
 }

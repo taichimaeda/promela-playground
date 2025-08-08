@@ -1,5 +1,5 @@
 #ifndef NUM_THREADS
-#define NUM_THREADS 2 // default value if not set by -DNUMTHREADS
+#define NUM_THREADS 23 // default value if not set by -DNUMTHREADS
 #endif
 
 #define MAX_SPIN 4
@@ -97,9 +97,6 @@ inline mutex_unlock() {
      new = old - (1<<MUTEX_WAITER_SHIFT) | MUTEX_WOKEN;
      atomic_compare_and_swap(mutex_state, old, new, swapped);
      if
-     // now we can use sema release
-     // the woken bit does necessary bookkeeping to prevent duplicate sema release
-     // sema value should always be 0 or 1 from now on
      :: swapped -> sema_release(mutex_sema);
      :: else
      fi

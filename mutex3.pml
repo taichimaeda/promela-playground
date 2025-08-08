@@ -9,10 +9,10 @@
 #define MUTEX_STARVING 4     // 1 << 2
 #define MUTEX_WAITER_SHIFT 3 // 3
 
-#include "rchan.pml"
+#include "sema4.pml"
 #include "atomic.pml"
 
-Rchan mutex_rchan;
+Sema mutex_sema;
 byte mutex_state;
 
 inline mutex_lock() {
@@ -29,7 +29,7 @@ continue:
            goto continue;
         :: else
         fi
-        rchan_wait(mutex_rchan);
+        sema_acquire(mutex_sema);
      :: else -> break;
      fi
   od
@@ -37,7 +37,7 @@ continue:
 
 inline mutex_unlock() {
   atomic_store(mutex_state, 0);
-  rchan_wake(mutex_rchan);
+  sema_release(mutex_sema);
 }
 
 byte num_threads_in_cs;

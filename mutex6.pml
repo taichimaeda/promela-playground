@@ -9,7 +9,7 @@
 #define MUTEX_STARVING 4     // 1 << 2
 #define MUTEX_WAITER_SHIFT 3 // 3
 
-#include "sema2.pml"
+#include "sema3.pml"
 #include "atomic.pml"
 
 Sema mutex_sema;
@@ -20,6 +20,8 @@ inline mutex_lock() {
   byte old;
   byte new;
   bool awoke;
+  bool lifo;
+  bool waited;
   bool swapped;
 
   atomic_compare_and_swap(mutex_state, 0, MUTEX_LOCKED, swapped)
@@ -28,6 +30,7 @@ inline mutex_lock() {
   :: else
   fi
 
+  waited = false;
   awoke = false;
   iter = 0;
   old = mutex_state;
@@ -66,7 +69,9 @@ continue:
         :: (old&MUTEX_LOCKED) == 0 -> break;
         :: else
         fi
-        sema_acquire(mutex_sema);
+        lifo = waited;
+        waited = true;
+        sema_acquire(mutex_sema, lifo);
         awoke = true;
         iter = 0;
      :: else
@@ -97,8 +102,6 @@ inline mutex_unlock() {
      new = old - (1<<MUTEX_WAITER_SHIFT) | MUTEX_WOKEN;
      atomic_compare_and_swap(mutex_state, old, new, swapped);
      if
-     // now we can use sema release
-     // the woken bit does necessary bookkeeping to prevent duplicate sema release
      :: swapped -> sema_release(mutex_sema);
      :: else
      fi

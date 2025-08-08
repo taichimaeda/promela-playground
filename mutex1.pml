@@ -13,12 +13,14 @@
 #include "sema2.pml"
 #include "atomic.pml"
 
+Sema mutex_sema;
+
 inline mutex_lock() {
-  mutex_sema_acquire()
+  sema_acquire(mutex_sema);
 }
 
 inline mutex_unlock() {
-  mutex_sema_release()
+  sema_release(mutex_sema);
 }
 
 byte num_threads_in_cs;
@@ -35,8 +37,8 @@ active [NUM_THREADS] proctype Thread() {
      num_threads_in_cs++;
      num_threads_in_cs--;
      mutex_unlock();
-     have_lock[_pid] = false
-  :: break
+     have_lock[_pid] = false;
+  :: break;
   od
 }
 

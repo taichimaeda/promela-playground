@@ -9,8 +9,11 @@
 #define MUTEX_STARVING 4     // 1 << 2
 #define MUTEX_WAITER_SHIFT 3 // 3
 
-#include "sema2.pml"
+#include "chan.pml"
 #include "atomic.pml"
+
+Chan mutex_chan;
+byte mutex_state;
 
 inline mutex_lock() {
   byte iter;
@@ -18,20 +21,20 @@ inline mutex_lock() {
   byte new;
   bool swapped;
 
-  atomic_compare_and_swap(mutex.state, 0, MUTEX_LOCKED, swapped)
+  atomic_compare_and_swap(mutex_state, 0, MUTEX_LOCKED, swapped)
   if
   :: swapped -> goto done
   :: else
   fi
 
   iter = 0;
-  old = mutex.state;
+  old = mutex_state;
 continue:
   do
   :: if
      :: (old&MUTEX_LOCKED) != 0 && iter < MAX_SPIN ->
         iter++;
-        old = mutex.state;
+        old = mutex_state;
         goto continue;
      :: else
      fi
@@ -41,18 +44,18 @@ continue:
         new = new + (1 << MUTEX_WAITER_SHIFT);
      :: else
      fi
-     atomic_compare_and_swap(mutex.state, old, new, swapped);
+     atomic_compare_and_swap(mutex_state, old, new, swapped);
      if
      :: swapped ->
         if
         :: (old&MUTEX_LOCKED) == 0 -> break
         :: else
         fi
-        mutex_sema_acquire();
+        chan_wait(mutex_chan);
         iter = 0
      :: else
      fi
-     old = mutex.state
+     old = mutex_state
   od
 done:
 }
@@ -62,7 +65,7 @@ inline mutex_unlock() {
   byte new;
   bool swapped;
 
-  atomic_add(mutex.state, -MUTEX_LOCKED, new);
+  atomic_add(mutex_state, -MUTEX_LOCKED, new);
   if
   :: new == 0; goto done
   :: else
@@ -76,12 +79,12 @@ inline mutex_unlock() {
      :: else
      fi
      new = old - (1<<MUTEX_WAITER_SHIFT);
-     atomic_compare_and_swap(mutex.state, old, new, swapped);
+     atomic_compare_and_swap(mutex_state, old, new, swapped);
      if
-     :: swapped -> mutex_sema_release()
+     :: swapped -> chan_wake(mutex_chan)
      :: else
      fi
-     old = mutex.state
+     old = mutex_state
   od
 done:
 }
@@ -95,17 +98,11 @@ active [NUM_THREADS] proctype Thread() {
      num_threads_in_cs++;
      num_threads_in_cs--;
      mutex_unlock();
-  :: break
+  :: break;
   od
 }
 
 // // mutual exclusion
 // ltl safety {
 //   [](num_threads_in_cs <= 1)
-// }
-
-// no starvation (does not hold)
-// ltl liveness {
-//   [](want_lock[0] -> <>have_lock[0]) && 
-//   [](want_lock[1] -> <>have_lock[1])
 // }

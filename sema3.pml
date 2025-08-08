@@ -11,44 +11,37 @@ typedef Sema {
   byte count;
 }
 
-typedef Mutex {
-  Sema sema;
-  byte state;
-}
-
-Mutex mutex;
-
-inline mutex_sema_acquire(lifo) {
+inline sema_acquire(sema, lifo) {
   atomic {
     if
-    :: mutex.sema.value > 0;
+    :: sema.value > 0;
     :: else ->
        if
        :: lifo -> 
-          mutex.sema.head = (mutex.sema.head + NUM_THREADS - 1) % NUM_THREADS;
-          mutex.sema.waiters[mutex.sema.head] = _pid;
+          sema.head = (sema.head + NUM_THREADS - 1) % NUM_THREADS;
+          sema.waiters[sema.head] = _pid;
        :: else ->
-          mutex.sema.waiters[mutex.sema.tail] = _pid;
-          mutex.sema.tail = (mutex.sema.tail + 1) % NUM_THREADS;
+          sema.waiters[sema.tail] = _pid;
+          sema.tail = (sema.tail + 1) % NUM_THREADS;
        fi
-       mutex.sema.count++;
-       mutex.sema.waiting[_pid] = true;
-       !mutex.sema.waiting[_pid]; // wait until ready
+       sema.count++;
+       sema.waiting[_pid] = true;
+       !sema.waiting[_pid]; // wait until ready
     fi
-    mutex.sema.value--;
+    sema.value--;
   }
 }
 
-inline mutex_sema_release() {
+inline sema_release(sema) {
   atomic {
     if
-    :: mutex.sema.count > 0 ->
-       byte id = mutex.sema.waiters[mutex.sema.head];
-       mutex.sema.head = (mutex.sema.head + 1) % NUM_THREADS;
-       mutex.sema.waiting[id] = false;
-       mutex.sema.count--;
+    :: sema.count > 0 ->
+       byte id = sema.waiters[sema.head];
+       sema.head = (sema.head + 1) % NUM_THREADS;
+       sema.waiting[id] = false;
+       sema.count--;
     :: else
     fi
-    mutex.sema.value++;
+    sema.value++;
   }
 }

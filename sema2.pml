@@ -9,37 +9,30 @@ typedef Sema {
   byte count;
 }
 
-typedef Mutex {
-  Sema sema;
-  byte state;
-}
-
-Mutex mutex;
-
-inline mutex_sema_acquire() {
+inline sema_acquire(sema) {
   atomic {
     if
-    :: mutex.sema.value == 0 ->
-       mutex.sema.count++;
-       mutex.sema.waiters ! _pid;
-       mutex.sema.waiting[_pid] = true;
-       !mutex.sema.waiting[_pid]; // wait until ready
+    :: sema.value == 0 ->
+       sema.count++;
+       sema.waiters ! _pid;
+       sema.waiting[_pid] = true;
+       !sema.waiting[_pid]; // wait until ready
     :: else
     fi
-    mutex.sema.value--;
+    sema.value--;
   }
 }
 
-inline mutex_sema_release() {
+inline sema_release(sema) {
   atomic {
     if
-    :: mutex.sema.count > 0 ->
+    :: sema.count > 0 ->
        byte id;
-       mutex.sema.waiters ? id;
-       mutex.sema.waiting[id] = false;
-       mutex.sema.count--;
+       sema.waiters ? id;
+       sema.waiting[id] = false;
+       sema.count--;
     :: else
     fi
-    mutex.sema.value++;
+    sema.value++;
   }
 }

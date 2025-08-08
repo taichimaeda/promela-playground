@@ -99,6 +99,7 @@ inline mutex_unlock() {
      if
      // now we can use sema release
      // the woken bit does necessary bookkeeping to prevent duplicate sema release
+     // sema value should always be 0 or 1 from now on
      :: swapped -> sema_release(mutex_sema);
      :: else
      fi

@@ -3,7 +3,7 @@
 #endif
 
 #define MAX_SPIN 4
-#define STARVATION_THRESHOLD 2 // TODO: increase threshold
+#define STARVATION_THRESHOLD 10 // can be any value more than 1
 
 #define MUTEX_LOCKED 1       // 1 << 0
 #define MUTEX_WOKEN 2        // 1 << 1
@@ -57,7 +57,7 @@ continue:
         goto continue;
      :: else
      fi
-     new = old | MUTEX_LOCKED;
+     new = old;
      if
      :: (old&MUTEX_STARVING) == 0 ->
         new = new | MUTEX_LOCKED;
@@ -85,7 +85,13 @@ continue:
         :: else
         fi
         lifo = (wait != 0);
-        wait++; // simulates global clock to prevent state explosion
+        if
+        :: wait < STARVATION_THRESHOLD -> 
+           // approximates wait duration and stops incrementing if already reaching threshold
+           // to prevent state explosion 
+           wait++; 
+        :: else
+        fi 
         sema_acquire(mutex_sema, lifo);
         starving = starving || (wait > STARVATION_THRESHOLD);
         old = mutex_state;

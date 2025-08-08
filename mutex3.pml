@@ -9,10 +9,10 @@
 #define MUTEX_STARVING 4     // 1 << 2
 #define MUTEX_WAITER_SHIFT 3 // 3
 
-#include "chan.pml"
+#include "rchan.pml"
 #include "atomic.pml"
 
-Chan mutex_chan;
+Rchan mutex_rchan;
 byte mutex_state;
 
 inline mutex_lock() {
@@ -29,7 +29,7 @@ continue:
            goto continue;
         :: else
         fi
-        chan_wait(mutex_chan);
+        rchan_wait(mutex_rchan);
      :: else -> break;
      fi
   od
@@ -37,7 +37,7 @@ continue:
 
 inline mutex_unlock() {
   atomic_store(mutex_state, 0);
-  chan_wake(mutex_chan);
+  rchan_wake(mutex_rchan);
 }
 
 byte num_threads_in_cs;

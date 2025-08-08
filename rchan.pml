@@ -1,10 +1,10 @@
 // rendezvous channel with FIFO wake up order
-typedef Chan {
+typedef Rchan {
   bool waiting[NUM_THREADS];
   chan waiters = [NUM_THREADS] of { byte };
 }
 
-inline chan_wait(ch) {
+inline rchan_wait(ch) {
   atomic {
     ch.waiters ! _pid;
     ch.waiting[_pid] = true;
@@ -12,7 +12,7 @@ inline chan_wait(ch) {
   }
 }
 
-inline chan_wake(ch) {
+inline rchan_wake(ch) {
   atomic {
     if
     :: ch.waiters ? [_] ->

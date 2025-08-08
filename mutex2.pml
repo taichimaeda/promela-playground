@@ -2,7 +2,12 @@
 #define NUM_THREADS 2 // default value if not set by -DNUMTHREADS
 #endif
 
-#define MUTEX_LOCKED 1
+#define MAX_SPIN 4
+
+#define MUTEX_LOCKED 1       // 1 << 0
+#define MUTEX_WOKEN 2        // 1 << 1
+#define MUTEX_STARVING 4     // 1 << 2
+#define MUTEX_WAITER_SHIFT 3 // 3
 
 inline atomic_load(loc, ret) {
   d_step { ret = loc }
@@ -25,7 +30,7 @@ inline atomic_add(loc, val, ret) {
 }
 
 typedef Sema {
-  byte value = 1;
+  byte value;
   bool waiting[NUM_THREADS];
   chan waiters = [NUM_THREADS] of { byte };
   byte count;
@@ -41,26 +46,28 @@ Mutex mutex;
 inline mutex_sema_acquire() {
   atomic {
     if
-    :: mutex.sema.value > 0 -> mutex.sema.value--
-    :: else ->
+    :: mutex.sema.value == 0 ->
+       mutex.sema.count++;
        mutex.sema.waiters ! _pid;
        mutex.sema.waiting[_pid] = true;
-       mutex.sema.count++
+       !mutex.sema.waiting[_pid]; // wait until ready
+    :: else
     fi
+    mutex.sema.value--;
   }
-  !mutex.sema.waiting[_pid] // wait until ready
 }
 
 inline mutex_sema_release() {
   atomic {
     if
-    :: mutex.sema.count == 0 -> mutex.sema.value++
-    :: else -> 
+    :: mutex.sema.count > 0 ->
        byte id;
        mutex.sema.waiters ? id;
        mutex.sema.waiting[id] = false;
-       mutex.sema.count--
+       mutex.sema.count--;
+    :: else
     fi
+    mutex.sema.value++;
   }
 }
 

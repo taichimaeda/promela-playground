@@ -102,7 +102,9 @@ inline mutex_unlock() {
      new = old - (1<<MUTEX_WAITER_SHIFT) | MUTEX_WOKEN;
      atomic_compare_and_swap(mutex_state, old, new, swapped);
      if
-     :: swapped -> sema_release(mutex_sema);
+     :: swapped ->
+        sema_release(mutex_sema);
+        assert(mutex_sema.value <= 1);
      :: else
      fi
      old = mutex_state;

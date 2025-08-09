@@ -81,9 +81,6 @@ inline mutex_unlock() {
      new = old - (1<<MUTEX_WAITER_SHIFT);
      atomic_compare_and_swap(mutex_state, old, new, swapped);
      if
-     // now we can use regular sema release
-     // the waiter count does necessary bookkeeping to prevent duplicate sema release
-     // sema value should always be 0 or 1 from now on
      :: swapped -> sema_release(mutex_sema);
      :: else
      fi

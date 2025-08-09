@@ -11,7 +11,7 @@
 
 // need to set max sema value
 // otherwise sema release can repeatedly increment it until overflow
-#define MAX_SEMA_VALUE 1
+#define MAX_SEMA_VALUE (NUM_THREADS-1)
 #include "sema2.pml"
 #include "atomic.pml"
 

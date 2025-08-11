@@ -107,6 +107,15 @@ active [NUM_THREADS] proctype Thread() {
   od
 }
 
+// simple checks for possible causes of state explosion other than thread interleaving
+// when there are 3 or more threads
+// ltl assert1 {
+//   []((mutex_state>>MUTEX_WAITER_SHIFT) < NUM_THREADS)
+// }
+// ltl assert2 {
+//   [](0 <= mutex_sema.value && mutex_sema.value < NUM_THREADS)
+// }
+
 // // mutual exclusion
 // ltl safety {
 //   [](num_threads_in_cs <= 1)

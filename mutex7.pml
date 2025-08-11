@@ -1,7 +1,4 @@
-#ifndef NUM_THREADS
-#define NUM_THREADS 2 // default value if not set by -DNUMTHREADS
-#endif
-
+#define NUM_THREADS 2
 #define MAX_SPIN 4
 #define STARVATION_THRESHOLD 10 // can be any value more than 1
 

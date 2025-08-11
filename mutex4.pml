@@ -9,6 +9,11 @@
 #define MUTEX_STARVING 4     // 1 << 2
 #define MUTEX_WAITER_SHIFT 3 // 3
 
+// cannot set max to 1 this time
+// assume there are N waiters and N new G's barge in to acquire and release the mutex
+// then only 1 waiter will be waken up but waiters count now becomes zero
+// which allows unlock to exit without waking up any other waiters
+#define MAX_SEMA_VALUE (NUM_THREADS-1)
 #include "sema2.pml"
 #include "atomic.pml"
 

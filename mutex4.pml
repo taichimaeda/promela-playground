@@ -1,3 +1,6 @@
+// from now on 2 is the practical limit for the number of threads
+// there may be a critical bug that is leading to such state explosion
+// that only occurs when there are 3 or more threads
 #define NUM_THREADS 2
 #define MAX_SPIN 4
 

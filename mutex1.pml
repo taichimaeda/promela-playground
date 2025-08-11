@@ -1,4 +1,4 @@
-#define NUM_THREADS 2
+#define NUM_THREADS 3
 #define MAX_SPIN 4
 
 #define MUTEX_LOCKED 1       // 1 << 0

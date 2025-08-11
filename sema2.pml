@@ -11,28 +11,21 @@ typedef Sema {
 
 inline sema_acquire(sema) {
   atomic {
-    if
+    do
     :: sema.value == 0 ->
        sema.count++;
        sema.waiters ! _pid;
        sema.waiting[_pid] = true;
        !sema.waiting[_pid]; // wait until ready
-    :: else
-    fi
+    :: else -> break
+    od
+    assert(sema.value > 0);
     sema.value--;
   }
 }
 
 inline sema_release(sema) {
   atomic {
-    if
-    :: sema.count > 0 ->
-       byte id;
-       sema.waiters ? id;
-       sema.waiting[id] = false;
-       sema.count--;
-    :: else
-    fi
 #ifndef MAX_SEMA_VALUE
   sema.value++;
 #else
@@ -42,5 +35,13 @@ inline sema_release(sema) {
   :: else
   fi
 #endif
+    if
+    :: sema.count > 0 ->
+       byte id;
+       sema.waiters ? id;
+       sema.waiting[id] = false;
+       sema.count--;
+    :: else
+    fi
   }
 }

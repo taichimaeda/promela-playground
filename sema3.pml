@@ -13,9 +13,8 @@ typedef Sema {
 
 inline sema_acquire(sema, lifo) {
   atomic {
-    if
-    :: sema.value > 0;
-    :: else ->
+    do
+    :: sema.value == 0 ->
        if
        :: lifo -> 
           sema.head = (sema.head + NUM_THREADS - 1) % NUM_THREADS;
@@ -27,21 +26,15 @@ inline sema_acquire(sema, lifo) {
        sema.count++;
        sema.waiting[_pid] = true;
        !sema.waiting[_pid]; // wait until ready
-    fi
+    :: else -> break
+    od
+    assert(sema.value > 0);
     sema.value--;
   }
 }
 
 inline sema_release(sema) {
   atomic {
-    if
-    :: sema.count > 0 ->
-       byte id = sema.waiters[sema.head];
-       sema.head = (sema.head + 1) % NUM_THREADS;
-       sema.waiting[id] = false;
-       sema.count--;
-    :: else
-    fi
 #ifndef MAX_SEMA_VALUE
   sema.value++;
 #else
@@ -51,5 +44,13 @@ inline sema_release(sema) {
   :: else
   fi
 #endif
+    if
+    :: sema.count > 0 ->
+       byte id = sema.waiters[sema.head];
+       sema.head = (sema.head + 1) % NUM_THREADS;
+       sema.waiting[id] = false;
+       sema.count--;
+    :: else
+    fi
   }
 }

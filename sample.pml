@@ -1,37 +1,49 @@
-#define N 2
+#define NUM_THREADS 2
 
 byte next_ticket = 0;
 byte curr_ticket = 0;
-byte my_ticket[N];
-bool in_cs[N];
+byte my_ticket[NUM_THREADS];
 
-proctype worker(byte id) {
+inline mutex_lock() {
+  assert(_pid < NUM_THREADS);
   d_step {
-    my_ticket[id] = next_ticket;
+    my_ticket[_pid] = next_ticket;
     next_ticket++;
   }
-
   do
-  :: curr_ticket == my_ticket[id] -> break;
+  :: curr_ticket == my_ticket[_pid] -> break;
   od
+}
 
-  in_cs[id] = true;
-  skip; // simulate work
-  in_cs[id] = false;
-
+inline mutex_unlock() {
   d_step {
     curr_ticket++;
   }
 }
 
-ltl safety { [](!(in_cs[0] && in_cs[1])) }
+byte num_threads_in_cs;
+bool want_lock[NUM_THREADS];
+bool have_lock[NUM_THREADS];
 
-ltl liveness0 { []((my_ticket[0] < curr_ticket) -> <>in_cs[0]) }
-ltl liveness1 { []((my_ticket[1] < curr_ticket) -> <>in_cs[1]) }
+active [NUM_THREADS] proctype worker() {
+  want_lock[_pid] = true;
+  mutex_lock()
+  want_lock[_pid] = false;
+  have_lock[_pid] = true;
+  num_threads_in_cs++;
+  skip; // simulate work
+  num_threads_in_cs--;
+  have_lock[_pid] = false;
+  mutex_unlock()
+}
 
-init {
-  atomic {
-    run worker(0);
-    run worker(1);
-  }
+// mutual exclusion
+ltl safety {
+  [](num_threads_in_cs <= 1)
+}
+
+// no starvation
+ltl liveness {
+  [](want_lock[0] -> <>have_lock[0]) && 
+  [](want_lock[1] -> <>have_lock[1])
 }

@@ -33,8 +33,8 @@ active [NUM_THREADS] proctype Thread() {
      have_lock[_pid] = true;
      num_threads_in_cs++;
      num_threads_in_cs--;
-     mutex_unlock();
      have_lock[_pid] = false;
+     mutex_unlock();
   :: break;
   od
 }

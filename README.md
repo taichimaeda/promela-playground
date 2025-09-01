@@ -21,12 +21,12 @@ spin -p -t version1.pml
 Checking for deadlocks:
 
 * Comment out LTL formulas to check for invalid end states
-* Run `spin -a version1.pml && clang -o pan pan.c && ./pan -a -b`
+* Run `spin -a version1.pml && clang -o pan pan.c && ./pan -a -b -m10000000`
 
 Checking mutual exclusion property (safety):
 
-* Run `spin -a version1.pml && clang -o pan pan.c && ./pan -a -b -N "safety"`
+* Run `spin -a version1.pml && clang -o pan pan.c && ./pan -a -b -m10000000 -N "safety"`
 
 Checking no starvation property (liveness):
 
-* Run `spin -a version1.pml && clang -o pan pan.c && ./pan -a -b -f -N "liveness"`
+* Run `spin -a version1.pml && clang -o pan pan.c && ./pan -a -b -f -m10000000 -N "liveness"`

@@ -9,11 +9,6 @@
 #define MUTEX_STARVING 4     // 1 << 2
 #define MUTEX_WAITER_SHIFT 3 // 3
 
-// cannot set max to 1 this time
-// assume there are N waiters and N new G's barge in to acquire and release the mutex
-// then only 1 waiter will be waken up but waiters count now becomes zero
-// which allows unlock to exit without waking up any other waiters
-#define MAX_SEMA_VALUE (NUM_THREADS-1)
 #include "sema2.pml"
 #include "atomic.pml"
 
@@ -86,7 +81,12 @@ inline mutex_unlock() {
      new = old - (1<<MUTEX_WAITER_SHIFT);
      atomic_compare_and_swap(mutex_state, old, new, swapped);
      if
-     :: swapped -> sema_release(mutex_sema);
+     :: swapped ->
+        // now we can use regular sema release
+        // sema value is only incremented by the number of waiters
+        // which should not exceed the number of threads
+        sema_release(mutex_sema);
+        assert(mutex_sema.value <= NUM_THREADS);
      :: else
      fi
      old = mutex_state;

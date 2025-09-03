@@ -47,5 +47,6 @@ active [NUM_THREADS] proctype Thread() {
 // // no starvation
 // ltl liveness {
 //   [](want_lock[0] -> <>have_lock[0]) && 
-//   [](want_lock[1] -> <>have_lock[1])
+//   [](want_lock[1] -> <>have_lock[1]) && 
+//   [](want_lock[2] -> <>have_lock[2])
 // }

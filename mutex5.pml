@@ -94,9 +94,9 @@ inline mutex_unlock() {
      new = old - (1<<MUTEX_WAITER_SHIFT) | MUTEX_WOKEN;
      atomic_compare_and_swap(mutex_state, old, new, swapped);
      if
-     // now we can use regular sema release
+     // again we can use regular sema release
      // the woken bit does necessary bookkeeping to prevent duplicate sema release
-     // sema value should always be 0 or 1 from now on
+     // sema value should always be 0 or 1
      :: swapped -> 
         sema_release(mutex_sema);
         assert(mutex_sema.value <= 1);

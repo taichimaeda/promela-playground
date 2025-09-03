@@ -37,13 +37,13 @@ active [NUM_THREADS] proctype worker() {
   mutex_unlock()
 }
 
-// mutual exclusion
-ltl safety {
-  [](num_threads_in_cs <= 1)
-}
+// // mutual exclusion
+// ltl safety {
+//   [](num_threads_in_cs <= 1)
+// }
 
-// no starvation
-ltl liveness {
-  [](want_lock[0] -> <>have_lock[0]) && 
-  [](want_lock[1] -> <>have_lock[1])
-}
+// // no starvation
+// ltl liveness {
+//   [](want_lock[0] -> <>have_lock[0]) && 
+//   [](want_lock[1] -> <>have_lock[1])
+// }

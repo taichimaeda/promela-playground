@@ -18,10 +18,19 @@ byte mutex_state;
 
 inline mutex_lock() {
   byte old;
+  byte iter = 0;
+continue:
   do
   :: atomic_swap(mutex_state, MUTEX_LOCKED, old);
      if
-     :: old != 0 -> sema_acquire(mutex_sema);
+     :: old != 0 ->
+        if
+        :: iter < MAX_SPIN ->
+           iter++;
+           goto continue;
+        :: else
+        fi
+        sema_acquire(mutex_sema);
      :: else -> break;
      fi
   od

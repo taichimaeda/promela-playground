@@ -1,12 +1,13 @@
 #define NUM_THREADS 2
 #define MAX_SPIN 4
+#define STARVATION_THRESHOLD 10 // can be any value more than 1
 
 #define MUTEX_LOCKED 1       // 1 << 0
 #define MUTEX_WOKEN 2        // 1 << 1
 #define MUTEX_STARVING 4     // 1 << 2
 #define MUTEX_WAITER_SHIFT 3 // 3
 
-#include "sema2.pml"
+#include "sema3.pml"
 #include "atomic.pml"
 
 Sema mutex_sema;
@@ -16,8 +17,13 @@ inline mutex_lock() {
   byte iter;
   byte old;
   byte new;
+  bool starving;
   bool awoke;
+  bool lifo;
+  byte wait;
   bool swapped;
+  byte delta;
+  byte null; // used to ignore return values
 
   atomic_compare_and_swap(mutex_state, 0, MUTEX_LOCKED, swapped)
   if
@@ -25,13 +31,15 @@ inline mutex_lock() {
   :: else
   fi
 
+  wait = 0;
+  starving = false;
   awoke = false;
   iter = 0;
   old = mutex_state;
 continue:
   do
   :: if
-     :: (old&MUTEX_LOCKED) != 0 && iter < MAX_SPIN ->
+     :: (old&(MUTEX_LOCKED|MUTEX_STARVING)) == MUTEX_LOCKED && iter < MAX_SPIN ->
         if 
         :: !awoke && (old&MUTEX_WOKEN) == 0 && (old>>MUTEX_WAITER_SHIFT) != 0 ->
            atomic_compare_and_swap(mutex_state, old, (old|MUTEX_WOKEN), swapped);
@@ -46,29 +54,63 @@ continue:
         goto continue;
      :: else
      fi
-     new = old | MUTEX_LOCKED;
+     new = old;
      if
-     :: (old&MUTEX_LOCKED) != 0 ->
+     :: (old&MUTEX_STARVING) == 0 ->
+        new = new | MUTEX_LOCKED;
+     :: else
+     fi
+     if
+     :: (old&(MUTEX_LOCKED|MUTEX_STARVING)) != 0 ->
         new = new + (1 << MUTEX_WAITER_SHIFT);
      :: else
      fi
      if
-     :: awoke -> new = new & (~MUTEX_WOKEN); // ~ is bitwise not
+     :: starving && (old&MUTEX_LOCKED) != 0 ->
+        new = new | MUTEX_STARVING;
+     :: else
+     fi
+     if
+     :: awoke -> new = new & (~MUTEX_WOKEN);
      :: else
      fi
      atomic_compare_and_swap(mutex_state, old, new, swapped);
      if
      :: swapped ->
         if
-        :: (old&MUTEX_LOCKED) == 0 -> break;
+        :: (old&(MUTEX_LOCKED|MUTEX_STARVING)) == 0 -> break;
         :: else
         fi
-        sema_acquire(mutex_sema);
+        // as an additional optimisation
+        // insert the current G to the head of the waiter queue if sleeping for the second time
+        lifo = (wait != 0);
+        if
+        :: wait < STARVATION_THRESHOLD -> 
+           // approximates wait duration and stops incrementing if already reaching threshold
+           // to prevent state explosion 
+           wait++; 
+        :: else
+        fi 
+        sema_acquire(mutex_sema, lifo);
+        starving = starving || (wait > STARVATION_THRESHOLD);
+        old = mutex_state;
+        if
+        :: (old&MUTEX_STARVING) != 0 ->
+           delta = MUTEX_LOCKED - (1<<MUTEX_WAITER_SHIFT);
+           if
+           :: !starving || (old>>MUTEX_WAITER_SHIFT) == 1 ->
+              delta = delta - MUTEX_STARVING;
+           :: else
+           fi
+           atomic_add(mutex_state, delta, null);
+           break;
+        :: else
+        fi
         awoke = true;
         iter = 0;
-     :: else
+     :: else ->
+        old = mutex_state; 
      fi
-     old = mutex_state;
   od
 done:
 }
@@ -84,26 +126,29 @@ inline mutex_unlock() {
   :: else
   fi
 
-  old = new;
-  do
-  :: if
-     :: (old>>MUTEX_WAITER_SHIFT) == 0 || (old&(MUTEX_LOCKED|MUTEX_WOKEN)) != 0 ->
-        goto done;
-     :: else
-     fi
-     new = old - (1<<MUTEX_WAITER_SHIFT) | MUTEX_WOKEN;
-     atomic_compare_and_swap(mutex_state, old, new, swapped);
-     if
-     // again we can use regular sema release
-     // the woken bit does necessary bookkeeping to prevent duplicate sema release
-     // sema value should always be 0 or 1
-     :: swapped -> 
-        sema_release(mutex_sema);
-        assert(mutex_sema.value <= 1);
-     :: else
-     fi
-     old = mutex_state;
-  od
+  if
+  :: (new&MUTEX_STARVING) == 0 ->
+     old = new;
+     do
+     :: if
+        :: (old>>MUTEX_WAITER_SHIFT) == 0 || (old&(MUTEX_LOCKED|MUTEX_WOKEN|MUTEX_STARVING)) != 0 ->
+           goto done;
+        :: else
+        fi
+        new = old - (1<<MUTEX_WAITER_SHIFT) | MUTEX_WOKEN;
+        atomic_compare_and_swap(mutex_state, old, new, swapped);
+        if
+        :: swapped ->
+           sema_release(mutex_sema);
+           assert(mutex_sema.value <= 1);
+        :: else
+        fi
+        old = mutex_state;
+     od
+  :: else -> 
+     sema_release(mutex_sema);
+     assert(mutex_sema.value <= 1);
+  fi
 done:
 }
 

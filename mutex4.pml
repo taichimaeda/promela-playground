@@ -1,6 +1,3 @@
-// from now on 2 is the practical limit for the number of threads
-// there may be a critical bug that is leading to such state explosion
-// that only occurs when there are 3 or more threads
 #define NUM_THREADS 2
 #define MAX_SPIN 4
 
@@ -19,6 +16,7 @@ inline mutex_lock() {
   byte iter;
   byte old;
   byte new;
+  bool awoke;
   bool swapped;
 
   atomic_compare_and_swap(mutex_state, 0, MUTEX_LOCKED, swapped)
@@ -27,12 +25,22 @@ inline mutex_lock() {
   :: else
   fi
 
+  awoke = false;
   iter = 0;
   old = mutex_state;
 continue:
   do
   :: if
      :: (old&MUTEX_LOCKED) != 0 && iter < MAX_SPIN ->
+        if 
+        :: !awoke && (old&MUTEX_WOKEN) == 0 && (old>>MUTEX_WAITER_SHIFT) != 0 ->
+           atomic_compare_and_swap(mutex_state, old, (old|MUTEX_WOKEN), swapped);
+           if
+           :: swapped -> awoke = true;
+           :: else
+           fi
+        :: else
+        fi
         iter++;
         old = mutex_state;
         goto continue;
@@ -44,6 +52,10 @@ continue:
         new = new + (1 << MUTEX_WAITER_SHIFT);
      :: else
      fi
+     if
+     :: awoke -> new = new & (~MUTEX_WOKEN); // ~ is bitwise not
+     :: else
+     fi
      atomic_compare_and_swap(mutex_state, old, new, swapped);
      if
      :: swapped ->
@@ -52,6 +64,7 @@ continue:
         :: else
         fi
         sema_acquire(mutex_sema);
+        awoke = true;
         iter = 0;
      :: else
      fi
@@ -74,19 +87,19 @@ inline mutex_unlock() {
   old = new;
   do
   :: if
-     :: (old>>MUTEX_WAITER_SHIFT) == 0 || (old&MUTEX_LOCKED) != 0 ->
+     :: (old>>MUTEX_WAITER_SHIFT) == 0 || (old&(MUTEX_LOCKED|MUTEX_WOKEN)) != 0 ->
         goto done;
      :: else
      fi
-     new = old - (1<<MUTEX_WAITER_SHIFT);
+     new = old - (1<<MUTEX_WAITER_SHIFT) | MUTEX_WOKEN;
      atomic_compare_and_swap(mutex_state, old, new, swapped);
      if
-     :: swapped ->
-        // now we can use regular sema release
-        // sema value is only incremented by the number of waiters
-        // which should not exceed the number of threads
+     // again we can use regular sema release
+     // the woken bit does necessary bookkeeping to prevent duplicate sema release
+     // sema value should always be 0 or 1
+     :: swapped -> 
         sema_release(mutex_sema);
-        assert(mutex_sema.value <= NUM_THREADS);
+        assert(mutex_sema.value <= 1);
      :: else
      fi
      old = mutex_state;
@@ -106,15 +119,6 @@ active [NUM_THREADS] proctype Thread() {
   :: break;
   od
 }
-
-// simple checks for possible causes of state explosion other than thread interleaving
-// when there are 3 or more threads
-// ltl assert1 {
-//   []((mutex_state>>MUTEX_WAITER_SHIFT) < NUM_THREADS)
-// }
-// ltl assert2 {
-//   [](0 <= mutex_sema.value && mutex_sema.value < NUM_THREADS)
-// }
 
 // // mutual exclusion
 // ltl safety {
